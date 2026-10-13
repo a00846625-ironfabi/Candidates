@@ -125,12 +125,6 @@ void izquierdaAdelante(int vel) {
   // M3
   analogWrite(ENA3, vel); digitalWrite(IN1_3, HIGH); digitalWrite(IN2_3, LOW);
 }
-void izquierdaAtras(int vel) {
-  // M1
-  analogWrite(ENB1, vel); digitalWrite(IN3_1, LOW); digitalWrite(IN4_1, HIGH);
-  // M3
-  analogWrite(ENA3, vel); digitalWrite(IN1_3, LOW); digitalWrite(IN2_3, HIGH);
-}
 
 // motores - Lado derecho unificado (M2 y M4)
 void derechaAdelante(int vel) {
@@ -138,12 +132,6 @@ void derechaAdelante(int vel) {
   analogWrite(ENA2, vel); digitalWrite(IN1_2, HIGH); digitalWrite(IN2_2, LOW);
   // M4
   analogWrite(ENB4, vel); digitalWrite(IN3_4, HIGH); digitalWrite(IN4_4, LOW);
-}
-void derechaAtras(int vel) {
-  // M2
-  analogWrite(ENA2, vel); digitalWrite(IN1_2, LOW); digitalWrite(IN2_2, HIGH);
-  // M4
-  analogWrite(ENB4, vel); digitalWrite(IN3_4, LOW); digitalWrite(IN4_4, HIGH);
 }
 
 void adelante()  { izquierdaAdelante(VELOCIDAD); derechaAdelante(VELOCIDAD); }

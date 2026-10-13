@@ -201,13 +201,7 @@ void loop() {
   long d4 = medirDistancia(trig4, echo4);  // frente (prende el servo)
 
   // decidir hacia dónde ir
-  if (d1 >= d2 && d1 >= d3) {
     adelante();
-  } else if (d2 > d1) {
-    girar90Izq();
-  } else {
-    girar90Der();
-  }
 
   // mecanismo para capturar la pelota
   if (d4 < DIST_OBSTACULO_4 && !servoMovido) {

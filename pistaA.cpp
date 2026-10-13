@@ -210,15 +210,6 @@ void loop() {
   long d3 = medirDistancia(trig3, echo3);  // derecha
   long d4 = medirDistancia(trig4, echo4);  // sensor de pelota
 
-  // decidir hacia dónde ir
-  if (d1 >= d2 && d1 >= d3) {
-    adelante();
-  } else if (d2 > d1) {
-    girar90Izq();
-  } else {
-    girar90Der();
-  }
-
   // mecanismo para capturar la pelota
   if (d4 < DIST_OBSTACULO_4 && !servoMovido) {
     servo.write(90);
