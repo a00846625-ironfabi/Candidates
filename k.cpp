@@ -1,141 +1,78 @@
-
-#include <U8g2lib.h> // pantalla
+#include <U8g2lib.h>
 #include <Servo.h>
 
-// servo
-const int servoPin = 6;
+// ---------- PANTALLA OLED ----------
+U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, /*SCL=*/ 42, /*SDA=*/ 41, U8X8_PIN_NONE);
 
-// ultra 1 (delante)
-const int echo1 = 31;
-const int trig1 = 30;
-
-// ultra 2 (izquierda)
-const int echo2 = 33;
-const int trig2 = 32;
-
-// ultra 3 (derecha)
-const int echo3 = 35;
-const int trig3 = 34;
-
-// ultra 4 (pelota)
-const int echo4 = 43;
-const int trig4 = 44;
-
-// pantalla
-const int PIN_SDA = 41;
-const int PIN_SCL = 42;
-
-// sensor de color
-const int PIN_S0 = 36;
-const int PIN_S1 = 37;
-const int PIN_S2 = 39;
-const int PIN_S3 = 38;
-const int PIN_OUT = 40;
-
-// motor M1 (derecho)
-const int ENB1 = 3;
-const int IN3_1 = 24;
-const int IN4_1 = 25;
-
-// motor M2 (derecho)
-const int ENA2 = 4;
-const int IN1_2 = 26;
-const int IN2_2 = 27;
-
-// motor M3 (izquierdo)
-const int ENA3 = 2;
-const int IN1_3 = 22;
-const int IN2_3 = 23;
-
-// motor M4 (izquierdo)
-const int ENB4 = 5;
-const int IN3_4 = 28;
-const int IN4_4 = 29;
-
-// configuracion
-const int VELOCIDAD = 100;
-const int DIST_OBSTACULO_4 = 15;
-const int TIEMPO_GIRO_90 = 600;
-const unsigned long TIMEOUT_US = 30000;
-
-// servo
+// ---------- SERVO ----------
 Servo servo;
+const int servoPin = 6;
 bool servoMovido = false;
 
-// pantalla
-U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C pantalla(
-  U8G2_R0, PIN_SCL, PIN_SDA, U8X8_PIN_NONE
-);
+// ---------- ULTRASÓNICOS ----------
+const int echo1 = 31, trig1 = 30; // Frontal
+const int echo2 = 33, trig2 = 32; // Izquierda
+const int echo3 = 35, trig3 = 34; // Derecha
+const int echo4 = 43, trig4 = 44; // Pelota
 
-// sensor de color
+// ---------- SENSOR DE COLOR ----------
+const int PIN_S0 = 36, PIN_S1 = 37, PIN_S2 = 39, PIN_S3 = 38, PIN_OUT = 40;
 const int LIMITE_NADA = 250;
 const unsigned long INTERVALO_COLOR = 300;
 unsigned long ultimaLecturaColor = 0;
 String colorActual = " ";
 
-// leer color
-int leerCanal(bool s2, bool s3) {
-  digitalWrite(PIN_S2, s2);
-  digitalWrite(PIN_S3, s3);
-  delay(10);
-  return pulseIn(PIN_OUT, LOW, 30000);
+// ---------- MOTORES (Corregido según esquema U2 y U3) ----------
+// Lado izquierdo (U3)
+const int L_IN1 = 26, L_IN2 = 27, L_ENA = 4;
+const int L_IN3 = 28, L_IN4 = 29, L_ENB = 5;
+
+// Lado derecho (U2)
+const int R_IN1 = 22, R_IN2 = 23, R_ENA = 2;
+const int R_IN3 = 24, R_IN4 = 25, R_ENB = 3;
+
+const int VELOCIDAD = 100;
+const int DIST_OBSTACULO = 15;
+const unsigned long TIMEOUT_US = 12000; // ~2 metros máx para no congelar el loop
+
+// ---------- CONTROL DE MOTORES ----------
+void ponerMotor(int in1, int in2, int en, bool adelante, int vel) {
+  digitalWrite(in1, adelante ? HIGH : LOW);
+  digitalWrite(in2, adelante ? LOW : HIGH);
+  analogWrite(en, vel);
 }
 
-String detectarColor() {
-  int r = leerCanal(LOW, LOW);
-  int g = leerCanal(HIGH, HIGH);
-  int b = leerCanal(LOW, HIGH);
-
-  Serial.print("R:");
-  Serial.print(r);
-  Serial.print(" G:");
-  Serial.print(g);
-  Serial.print(" B:");
-  Serial.println(b);
-
-  if (r == 0 || g == 0 || b == 0) return "---";
-
-  if (r > LIMITE_NADA &&
-      g > LIMITE_NADA &&
-      b > LIMITE_NADA) {
-    return "---";
-  }
-
-  float gr = (float)g / r;
-  float br = (float)b / r;
-
-  // cian
-  if (gr < 0.8 && br < 0.8 &&
-      abs(g - b) < 0.25 * max(g, b)) {
-    return "CIAN";
-  }
-
-  // amarillo
-  if (gr < 1.3 && br > 1.5) {
-    return "AMARILLO";
-  }
-
-  // naranja
-  if (gr >= 1.3 && b > g * 1.1) {
-    return "NARANJA";
-  }
-
-  // rosa
-  if (gr >= 1.3 && g > b * 1.1) {
-    return "ROSA";
-  }
-
-  return "---";
+void avanzar() {
+  ponerMotor(L_IN1, L_IN2, L_ENA, true, VELOCIDAD);
+  ponerMotor(L_IN3, L_IN4, L_ENB, true, VELOCIDAD);
+  ponerMotor(R_IN1, R_IN2, R_ENA, true, VELOCIDAD);
+  ponerMotor(R_IN3, R_IN4, R_ENB, true, VELOCIDAD);
 }
 
-void mostrarColor(const String &texto) {
-  pantalla.clearBuffer();
-  pantalla.setFont(u8g2_font_ncenB14_tr);
-  pantalla.drawStr(0, 24, texto.c_str());
-  pantalla.sendBuffer();
+void girarIzquierda() {
+  ponerMotor(L_IN1, L_IN2, L_ENA, false, VELOCIDAD);
+  ponerMotor(L_IN3, L_IN4, L_ENB, false, VELOCIDAD);
+  ponerMotor(R_IN1, R_IN2, R_ENA, true, VELOCIDAD);
+  ponerMotor(R_IN3, R_IN4, R_ENB, true, VELOCIDAD);
 }
 
-// medir distancia
+void girarDerecha() {
+  ponerMotor(L_IN1, L_IN2, L_ENA, true, VELOCIDAD);
+  ponerMotor(L_IN3, L_IN4, L_ENB, true, VELOCIDAD);
+  ponerMotor(R_IN1, R_IN2, R_ENA, false, VELOCIDAD);
+  ponerMotor(R_IN3, R_IN4, R_ENB, false, VELOCIDAD);
+}
+
+void parar() {
+  analogWrite(L_ENA, 0); analogWrite(L_ENB, 0);
+  analogWrite(R_ENA, 0); analogWrite(R_ENB, 0);
+  digitalWrite(L_IN1, LOW); digitalWrite(L_IN2, LOW);
+  digitalWrite(L_IN3, LOW); digitalWrite(L_IN4, LOW);
+  digitalWrite(R_IN1, LOW); digitalWrite(R_IN2, LOW);
+  digitalWrite(R_IN3, LOW); digitalWrite(R_IN4, LOW);
+}
+
+// ---------- ULTRASÓNICOS Y COLOR ----------
 long medirDistancia(int trig, int echo) {
   digitalWrite(trig, LOW);
   delayMicroseconds(2);
@@ -144,192 +81,102 @@ long medirDistancia(int trig, int echo) {
   digitalWrite(trig, LOW);
 
   long duracion = pulseIn(echo, HIGH, TIMEOUT_US);
-
   if (duracion == 0) return 400;
-
   return duracion * 0.034 / 2;
 }
 
-// LADO IZQUIERDO: M3 Y M4
-
-void izquierdaAdelante(int vel) {
-  // M3
-  analogWrite(ENA3, vel);
-  digitalWrite(IN1_3, HIGH);
-  digitalWrite(IN2_3, LOW);
-
-  // M4
-  analogWrite(ENB4, vel);
-  digitalWrite(IN3_4, HIGH);
-  digitalWrite(IN4_4, LOW);
+int leerCanalColor(bool s2, bool s3) {
+  digitalWrite(PIN_S2, s2);
+  digitalWrite(PIN_S3, s3);
+  delayMicroseconds(100);
+  return pulseIn(PIN_OUT, LOW, 15000);
 }
 
-void izquierdaAtras(int vel) {
-  // M3
-  analogWrite(ENA3, vel);
-  digitalWrite(IN1_3, LOW);
-  digitalWrite(IN2_3, HIGH);
+String detectarColor() {
+  int r = leerCanalColor(LOW, LOW);
+  int g = leerCanalColor(HIGH, HIGH);
+  int b = leerCanalColor(LOW, HIGH);
 
-  // M4
-  analogWrite(ENB4, vel);
-  digitalWrite(IN3_4, LOW);
-  digitalWrite(IN4_4, HIGH);
+  if (r == 0 || g == 0 || b == 0) return "---";
+  if (r > LIMITE_NADA && g > LIMITE_NADA && b > LIMITE_NADA) return "---";
+
+  float gr = (float)g / r;
+  float br = (float)b / r;
+
+  if (gr < 0.8 && br < 0.8 && abs(g - b) < 0.25 * max(g, b)) return "CIAN";
+  if (gr < 1.3 && br > 1.5) return "AMARILLO";
+  if (gr >= 1.3 && b > g * 1.1) return "NARANJA";
+  if (gr >= 1.3 && g > b * 1.1) return "ROSA";
+
+  return "---";
 }
 
-// LADO DERECHO: M1 Y M2
-
-void derechaAdelante(int vel) {
-  // M1
-  analogWrite(ENB1, vel);
-  digitalWrite(IN3_1, HIGH);
-  digitalWrite(IN4_1, LOW);
-
-  // M2
-  analogWrite(ENA2, vel);
-  digitalWrite(IN1_2, HIGH);
-  digitalWrite(IN2_2, LOW);
+void mostrarColor(const String &texto) {
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_ncenB14_tr);
+  u8g2.drawStr(0, 24, texto.c_str());
+  u8g2.sendBuffer();
 }
 
-void derechaAtras(int vel) {
-  // M1
-  analogWrite(ENB1, vel);
-  digitalWrite(IN3_1, LOW);
-  digitalWrite(IN4_1, HIGH);
-
-  // M2
-  analogWrite(ENA2, vel);
-  digitalWrite(IN1_2, LOW);
-  digitalWrite(IN2_2, HIGH);
-}
-
-// MOVIMIENTOS
-
-void adelante() {
-  izquierdaAdelante(VELOCIDAD);
-  derechaAdelante(VELOCIDAD);
-}
-
-void atras() {
-  izquierdaAtras(VELOCIDAD);
-  derechaAtras(VELOCIDAD);
-}
-
-void girarIzq() {
-  izquierdaAtras(VELOCIDAD);
-  derechaAdelante(VELOCIDAD);
-}
-
-void girarDer() {
-  izquierdaAdelante(VELOCIDAD);
-  derechaAtras(VELOCIDAD);
-}
-
-void detener() {
-  analogWrite(ENB1, 0);
-  analogWrite(ENA2, 0);
-  analogWrite(ENA3, 0);
-  analogWrite(ENB4, 0);
-}
-
-void girar90Izq() {
-  girarIzq();
-  delay(TIEMPO_GIRO_90);
-  adelante();
-}
-
-void girar90Der() {
-  girarDer();
-  delay(TIEMPO_GIRO_90);
-  adelante();
-}
-
-// CONFIGURACION INICIAL
-
+// ---------- SETUP Y LOOP ----------
 void setup() {
   Serial.begin(9600);
 
-  // ultrasónicos
-  pinMode(trig1, OUTPUT);
-  pinMode(echo1, INPUT);
+  int pinesMotores[] = { L_IN1, L_IN2, L_ENA, L_IN3, L_IN4, L_ENB,
+                         R_IN1, R_IN2, R_ENA, R_IN3, R_IN4, R_ENB };
+  for (int i = 0; i < 12; i++) pinMode(pinesMotores[i], OUTPUT);
+  parar();
 
-  pinMode(trig2, OUTPUT);
-  pinMode(echo2, INPUT);
+  pinMode(trig1, OUTPUT); pinMode(echo1, INPUT);
+  pinMode(trig2, OUTPUT); pinMode(echo2, INPUT);
+  pinMode(trig3, OUTPUT); pinMode(echo3, INPUT);
+  pinMode(trig4, OUTPUT); pinMode(echo4, INPUT);
 
-  pinMode(trig3, OUTPUT);
-  pinMode(echo3, INPUT);
-
-  pinMode(trig4, OUTPUT);
-  pinMode(echo4, INPUT);
-
-  // motores
-  pinMode(ENB1, OUTPUT);
-  pinMode(IN3_1, OUTPUT);
-  pinMode(IN4_1, OUTPUT);
-
-  pinMode(ENA2, OUTPUT);
-  pinMode(IN1_2, OUTPUT);
-  pinMode(IN2_2, OUTPUT);
-
-  pinMode(ENA3, OUTPUT);
-  pinMode(IN1_3, OUTPUT);
-  pinMode(IN2_3, OUTPUT);
-
-  pinMode(ENB4, OUTPUT);
-  pinMode(IN3_4, OUTPUT);
-  pinMode(IN4_4, OUTPUT);
-
-  // sensor de color
-  pinMode(PIN_S0, OUTPUT);
-  pinMode(PIN_S1, OUTPUT);
-  pinMode(PIN_S2, OUTPUT);
-  pinMode(PIN_S3, OUTPUT);
+  pinMode(PIN_S0, OUTPUT); pinMode(PIN_S1, OUTPUT);
+  pinMode(PIN_S2, OUTPUT); pinMode(PIN_S3, OUTPUT);
   pinMode(PIN_OUT, INPUT);
+  digitalWrite(PIN_S0, HIGH); digitalWrite(PIN_S1, LOW);
 
-  digitalWrite(PIN_S0, HIGH);
-  digitalWrite(PIN_S1, LOW);
+  u8g2.begin();
+  mostrarColor("INICIANDO");
 
-  // pantalla
-  pantalla.begin();
-  mostrarColor("HOLIS");
-
-  // servo
   servo.attach(servoPin);
   servo.write(0);
 
-  detener();
-  delay(3000);
-
-  adelante();
+  delay(3000); // Espera inicial de 3 segundos
 }
 
-// PROGRAMA PRINCIPAL
-
 void loop() {
-  long d1 = medirDistancia(trig1, echo1);
-  long d2 = medirDistancia(trig2, echo2);
-  long d3 = medirDistancia(trig3, echo3);
-  long d4 = medirDistancia(trig4, echo4);
+  // 1. Lecturas de distancia
+  long d1 = medirDistancia(trig1, echo1); // Delante
+  long d2 = medirDistancia(trig2, echo2); // Izquierda
+  long d3 = medirDistancia(trig3, echo3); // Derecha
+  long d4 = medirDistancia(trig4, echo4); // Pelota
 
-  // avanzar continuamente
-  adelante();
+  // 2. Lógica de navegación con evitación de obstáculos
+  if (d1 < DIST_OBSTACULO) {
+    if (d2 > d3) {
+      girarIzquierda();
+    } else {
+      girarDerecha();
+    }
+  } else {
+    avanzar();
+  }
 
-  // mecanismo para capturar la pelota
-  if (d4 < DIST_OBSTACULO_4 && !servoMovido) {
+  // 3. Captura de la pelota con Servo
+  if (d4 < DIST_OBSTACULO && !servoMovido) {
     servo.write(90);
     servoMovido = true;
   }
 
-  // mostrar color
+  // 4. Muestreo de color sin bloquear el bucle principal
   if (millis() - ultimaLecturaColor >= INTERVALO_COLOR) {
     ultimaLecturaColor = millis();
-
     String c = detectarColor();
-
     if (c != colorActual) {
       colorActual = c;
       mostrarColor(colorActual);
     }
   }
-
-  delay(50);
 }
