@@ -1,4 +1,4 @@
-#include <U8g2lib.h>
+#include <U8g2lib.h> // pantalla
 #include <Servo.h>
 
 // servo
@@ -17,8 +17,8 @@ const int echo3 = 35;
 const int trig3 = 34;
 
 // ultra 4 (pelota)
-const int echo4 = 43;
-const int trig4 = 44;
+const int echo4 = ;
+const int trig4 = ;// por definir
 
 // pantalla
 const int PIN_SDA = 41;
@@ -32,40 +32,41 @@ const int PIN_S3 = 38;
 const int PIN_OUT = 40;
 
 // motor M1
-const int ENB2 = 3;
-const int IN3_2 = 24;
-const int IN4_2 = 25;
+const int ENB1 = 3;
+const int IN3_1 = 24;
+const int IN4_1 = 25;
 
 // motor M2
-const int ENA1 = 4;
-const int IN1_1 = 26;
-const int IN2_1 = 27;
+const int ENA2 = 4;
+const int IN1_2 = 26;
+const int IN2_2 = 27;
 
 // motor M3
-const int ENA2 = 2;
-const int IN1_2 = 22;
-const int IN2_2 = 23;
+const int ENA3 = 2;
+const int IN1_3 = 22;
+const int IN2_3 = 23;
 
 // motor M4
-const int ENB1 = 5;
-const int IN3_1 = 28;
-const int IN4_1 = 29;
+const int ENB4 = 5;
+const int IN3_4 = 28;
+const int IN4_4 = 29;
 
-const int VELOCIDAD = 100;            
-const int DIST_OBSTACULO_4 = 15;        
+const int VELOCIDAD = 50;            // velocidad de las ruedas
+const int DIST_OBSTACULO_4 = 15;         
 const int TIEMPO_GIRO_90 = 600;         // tiempo de giro 
 const unsigned long TIMEOUT_US = 30000;
 
+// inicalizamos nombrando el servo como falso 
 Servo servo;
-bool servoMovido = false;
+bool servoMovido = false;    
 
 // pantalla con sensor 
-U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, PIN_SCL, PIN_SDA, U8X8_PIN_NONE);
+U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C pantalla(U8G2_R0, PIN_SCL, PIN_SDA, U8X8_PIN_NONE); 
 
 const int LIMITE_NADA = 250;                
 const unsigned long INTERVALO_COLOR = 300;   // cada cuántos ms lee el color
 unsigned long ultimaLecturaColor = 0;
-String colorActual = "";
+String colorActual = " ";
 
 int leerCanal(bool s2, bool s3) {
   digitalWrite(PIN_S2, s2);
@@ -106,10 +107,10 @@ String detectarColor() {
 }
 
 void mostrarColor(const String &texto) {
-  u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_ncenB14_tr);
-  u8g2.drawStr(0, 24, texto.c_str());
-  u8g2.sendBuffer();
+  pantalla.clearBuffer();
+  pantalla.setFont(pantalla_font_ncenB14_tr);
+  pantalla.drawStr(0, 24, texto.c_str());
+  pantalla.sendBuffer();
 }
 
 // ultrasonicos
@@ -127,20 +128,20 @@ long medirDistancia(int trig, int echo) {
 
 // motores
 void izquierdaAdelante(int vel) {
-  analogWrite(ENB2, vel); digitalWrite(IN3_2, HIGH); digitalWrite(IN4_2, LOW);
-  analogWrite(ENA1, vel); digitalWrite(IN1_1, HIGH); digitalWrite(IN2_1, LOW);
+  analogWrite(ENB1, vel); digitalWrite(IN3_1, HIGH); digitalWrite(IN4_1, LOW);
+  analogWrite(ENA3, vel); digitalWrite(IN1_2, HIGH); digitalWrite(IN2_2, LOW);
 }
 void izquierdaAtras(int vel) {
-  analogWrite(ENB2, vel); digitalWrite(IN3_2, LOW); digitalWrite(IN4_2, HIGH);
-  analogWrite(ENA1, vel); digitalWrite(IN1_1, LOW); digitalWrite(IN2_1, HIGH);
+  analogWrite(ENB1, vel); digitalWrite(IN3_1, LOW); digitalWrite(IN4_1, HIGH);
+  analogWrite(ENA3, vel); digitalWrite(IN1_2, LOW); digitalWrite(IN2_2, HIGH);
 }
 void derechaAdelante(int vel) {
   analogWrite(ENA2, vel); digitalWrite(IN1_2, HIGH); digitalWrite(IN2_2, LOW);
-  analogWrite(ENB1, vel); digitalWrite(IN3_1, HIGH); digitalWrite(IN4_1, LOW);
+  analogWrite(ENB4, vel); digitalWrite(IN3_1, HIGH); digitalWrite(IN4_1, LOW);
 }
 void derechaAtras(int vel) {
   analogWrite(ENA2, vel); digitalWrite(IN1_2, LOW); digitalWrite(IN2_2, HIGH);
-  analogWrite(ENB1, vel); digitalWrite(IN3_1, LOW); digitalWrite(IN4_1, HIGH);
+  analogWrite(ENB4, vel); digitalWrite(IN3_1, LOW); digitalWrite(IN4_1, HIGH);
 }
 
 void adelante()  { izquierdaAdelante(VELOCIDAD); derechaAdelante(VELOCIDAD); }
@@ -169,10 +170,10 @@ void setup() {
   pinMode(trig4, OUTPUT); pinMode(echo4, INPUT);
 
   // todos los motores
-  pinMode(ENB2, OUTPUT); pinMode(IN3_2, OUTPUT); pinMode(IN4_2, OUTPUT);
-  pinMode(ENA1, OUTPUT); pinMode(IN1_1, OUTPUT); pinMode(IN2_1, OUTPUT);
-  pinMode(ENA2, OUTPUT); pinMode(IN1_2, OUTPUT); pinMode(IN2_2, OUTPUT);
   pinMode(ENB1, OUTPUT); pinMode(IN3_1, OUTPUT); pinMode(IN4_1, OUTPUT);
+  pinMode(ENA2, OUTPUT); pinMode(IN1_2, OUTPUT); pinMode(IN2_2, OUTPUT);
+  pinMode(ENA1, OUTPUT); pinMode(IN1_1, OUTPUT); pinMode(IN2_1, OUTPUT);
+  pinMode(ENB2, OUTPUT); pinMode(IN3_2, OUTPUT); pinMode(IN4_2, OUTPUT);
 
   // sensor de color
   pinMode(PIN_S0, OUTPUT); pinMode(PIN_S1, OUTPUT);
@@ -182,7 +183,7 @@ void setup() {
   digitalWrite(PIN_S1, LOW);
 
   // pantalla
-  u8g2.begin();
+  pantalla.begin();
   mostrarColor("HOLIS");
 
   // servo
