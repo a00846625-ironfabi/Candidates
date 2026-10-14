@@ -200,7 +200,7 @@ void setup() {
   servo.attach(servoPin);
   servo.write(0);
 
-  delay(3000);   // espera 3 segundos
+  delay(2000);   // espera 2 segundos
   adelante();    // arrancan los motores hacia adelante
 }
 

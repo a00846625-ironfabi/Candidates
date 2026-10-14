@@ -1,28 +1,28 @@
 #include <U8g2lib.h>
 #include <Servo.h>
 
-// ---------- PANTALLA OLED ----------
+// pantalla
 U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, /*SCL=*/ 42, /*SDA=*/ 41, U8X8_PIN_NONE);
 
-// ---------- SERVO ----------
+// servo
 Servo servo;
 const int servoPin = 6;
 bool servoMovido = false;
 
-// ---------- ULTRASÓNICOS ----------
+// ultrasonicos
 const int echo1 = 31, trig1 = 30; // Frontal
 const int echo2 = 33, trig2 = 32; // Izquierda
 const int echo3 = 35, trig3 = 34; // Derecha
 const int echo4 = 43, trig4 = 44; // Pelota
 
-// ---------- SENSOR DE COLOR ----------
+// sensor de color
 const int PIN_S0 = 36, PIN_S1 = 37, PIN_S2 = 39, PIN_S3 = 38, PIN_OUT = 40;
 const int LIMITE_NADA = 250;
 const unsigned long INTERVALO_COLOR = 300;
 unsigned long ultimaLecturaColor = 0;
 String colorActual = " ";
 
-// ---------- MOTORES (Corregido según esquema U2 y U3) ----------
+// motores
 // Lado izquierdo (U3)
 const int L_IN1 = 26, L_IN2 = 27, L_ENA = 4;
 const int L_IN3 = 28, L_IN4 = 29, L_ENB = 5;
@@ -35,7 +35,7 @@ const int VELOCIDAD = 100;
 const int DIST_OBSTACULO = 15;
 const unsigned long TIMEOUT_US = 12000; // ~2 metros máx para no congelar el loop
 
-// ---------- CONTROL DE MOTORES ----------
+
 void ponerMotor(int in1, int in2, int en, bool adelante, int vel) {
   digitalWrite(in1, adelante ? HIGH : LOW);
   digitalWrite(in2, adelante ? LOW : HIGH);
@@ -72,7 +72,7 @@ void parar() {
   digitalWrite(R_IN3, LOW); digitalWrite(R_IN4, LOW);
 }
 
-// ---------- ULTRASÓNICOS Y COLOR ----------
+// ultrasonicos y color
 long medirDistancia(int trig, int echo) {
   digitalWrite(trig, LOW);
   delayMicroseconds(2);
@@ -118,7 +118,6 @@ void mostrarColor(const String &texto) {
   u8g2.sendBuffer();
 }
 
-// ---------- SETUP Y LOOP ----------
 void setup() {
   Serial.begin(9600);
 
@@ -143,7 +142,7 @@ void setup() {
   servo.attach(servoPin);
   servo.write(0);
 
-  delay(3000); // Espera inicial de 3 segundos
+  delay(2000); // espera 2 segundos
 }
 
 void loop() {
