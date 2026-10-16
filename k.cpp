@@ -137,7 +137,7 @@ void setup() {
   digitalWrite(PIN_S0, HIGH); digitalWrite(PIN_S1, LOW);
 
   u8g2.begin();
-  mostrarColor("INICIANDO");
+  mostrarColor("Holis");
 
   servo.attach(servoPin);
   servo.write(0);
@@ -154,10 +154,10 @@ void loop() {
 
   // 2. Lógica de navegación con evitación de obstáculos
   if (d1 < DIST_OBSTACULO) {
-    if (d2 > d3) {
-      girarIzquierda();
-    } else {
+    if (d3 > d2) {
       girarDerecha();
+    } else {
+      girarIzquierda();
     }
   } else {
     avanzar();
