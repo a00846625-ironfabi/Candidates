@@ -23,7 +23,7 @@ const int ENA3 = 2, IN1_3 = 22, IN2_3 = 23;   // M3
 const int ENA2 = 4, IN1_2 = 26, IN2_2 = 27;   // M2
 const int ENB4 = 5, IN3_4 = 28, IN4_4 = 29;   // M4
 
-const int VELOCIDAD = 50;                 // velocidad de las ruedas 
+const int VELOCIDAD = 150;                 // velocidad de las ruedas 
 const int DIST_OBSTACULO_4 = 15;
 const int TIEMPO_GIRO_90 = 600;
 const unsigned long TIMEOUT_US = 30000;
@@ -146,7 +146,6 @@ void setup() {
   pinMode(trig1, OUTPUT); pinMode(echo1, INPUT);
   pinMode(trig2, OUTPUT); pinMode(echo2, INPUT);
   pinMode(trig3, OUTPUT); pinMode(echo3, INPUT);
-  pinMode(trig4, OUTPUT); pinMode(echo4, INPUT);
 
   // motores
   int pines[] = { ENB1, IN3_1, IN4_1, ENA3, IN1_3, IN2_3, ENA2, IN1_2, IN2_2, ENB4, IN3_4, IN4_4 };
