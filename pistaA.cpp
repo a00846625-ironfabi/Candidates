@@ -1,97 +1,51 @@
 #include <U8g2lib.h>
-#include <Servo.h>
 
-// servo
-const int servoPin = 6;
+U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, 42, 41, U8X8_PIN_NONE);
 
-const int echo1 = 31, trig1 = 30; // Frontal
-const int echo2 = 33, trig2 = 32; // Izquierda
-const int echo3 = 35, trig3 = 34; // Derecha
+const int L_IN1 = 26, L_IN2 = 27, L_ENA = 4;   // Izquierdo 1 
+const int L_IN3 = 24, L_IN4 = 25, L_ENB = 3;   // Izquierdo 2
+const int R_IN1 = 28, R_IN2 = 29, R_ENA = 5;   // Derecho 1   
+const int R_IN3 = 22, R_IN4 = 23, R_ENB = 2;   // Derecho 2   
 
-// pantalla
-const int PIN_SDA = 41, PIN_SCL = 42;
+const int VELOCIDAD = 90;        // avance
+const int VELOCIDAD_GIRO = 100;   // giro
 
-// sensor de color
-const int PIN_S0 = 36, PIN_S1 = 37, PIN_S2 = 39, PIN_S3 = 38, PIN_OUT = 40;
+// ultras
+const int TRIG_F = 50, ECHO_F = 51;   // frontal
+const int TRIG_I = 32, ECHO_I = 33;   // izquierda
+const int TRIG_D = 30, ECHO_D = 31;   // derecha
 
-// motores
-// Lado derecho
-const int ENB1 = 3, IN3_1 = 24, IN4_1 = 25;   // M1
-const int ENA3 = 2, IN1_3 = 22, IN2_3 = 23;   // M3
+// sensor de color 
+const int S0 = 36, S1 = 37, S2 = 39, S3 = 38, SENSOR_OUT = 40;
 
-// Lado izquierdo
-const int ENA2 = 4, IN1_2 = 26, IN2_2 = 27;   // M2
-const int ENB4 = 5, IN3_4 = 28, IN4_4 = 29;   // M4
+struct ColorRef { const char* nombre; int r, g, b; };
+const ColorRef COLORES[] = {
+  { "ROJO",     9, 16, 14 },
+  { "AMARILLO", 8, 11, 13 },
+  { "AZUL",    11, 13, 11 },
+  { "VERDE",    8, 10, 12 },
+  { "NARANJA", 7, 14, 11 }
+};
+const int NUM_COLORES = sizeof(COLORES) / sizeof(COLORES[0]);
 
-const int VELOCIDAD = 150;                 // velocidad de las ruedas 
-const int DIST_OBSTACULO_4 = 15;
-const int TIEMPO_GIRO_90 = 600;
-const unsigned long TIMEOUT_US = 30000;
+const int MUESTRAS = 5;                 // lecturas para promediarse
+const float UMBRAL_DIST2 = 30.0;        
+const char* colorActual = "---";
+
+const int DIST_OBSTACULO = 22;                 // cm
+const unsigned long TIEMPO_GIRO_DER = 940;         // ms // giro a la derecha
+const unsigned long TIEMPO_GIRO_IZQ = 480;         // ms // giro a la IZQUIERDA
+const unsigned long TIEMPO_PAUSA = 450;        // ms
 
 // tiempo
-const unsigned long TIEMPO_ESPERA = 3000;
-const unsigned long TIEMPO_AVANCE = 10000;
-
-enum Estado { ESPERA, AVANZA, PARADO };
+const unsigned long TIEMPO_ESPERA = 5000;
+const unsigned long TIEMPO_AVANCE = 300;
+enum Estado { ESPERA, AVANZA, REVISA, GIRA };
 Estado estado = ESPERA;
-unsigned long tEstado = 0;     // cuándo empezó el estado actual
-unsigned long tPantalla = 0;   // última actualización de la pantalla
-
-// servo
-Servo servo;
-bool servoMovido = false;
-
-// pantalla
-U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C pantalla(U8G2_R0, PIN_SCL, PIN_SDA, U8X8_PIN_NONE);
-
-// color
-const int LIMITE_NADA = 250;
-const unsigned long INTERVALO_COLOR = 300;
-unsigned long ultimaLecturaColor = 0;
-String colorActual = "---";
-
-int leerCanal(bool s2, bool s3) {
-  digitalWrite(PIN_S2, s2);
-  digitalWrite(PIN_S3, s3);
-  delay(10);
-  return pulseIn(PIN_OUT, LOW, 30000);   // menor valor, más intensidad
-}
-
-String detectarColor() {
-  int r = leerCanal(LOW, LOW);
-  int g = leerCanal(HIGH, HIGH);
-  int b = leerCanal(LOW, HIGH);
-
-  Serial.print("R:"); Serial.print(r);
-  Serial.print(" G:"); Serial.print(g);
-  Serial.print(" B:"); Serial.println(b);
-
-  if (r == 0 || g == 0 || b == 0) return "---";
-  if (r > LIMITE_NADA && g > LIMITE_NADA && b > LIMITE_NADA) return "---";
-
-  float gr = (float)g / r;
-  float br = (float)b / r;
-
-  if (gr < 0.8 && br < 0.8 && abs(g - b) < 0.25 * max(g, b)) return "CIAN";
-  if (gr < 1.3 && br > 1.5) return "AMARILLO";
-  if (gr >= 1.3 && b > g * 1.1) return "NARANJA";
-  if (gr >= 1.3 && g > b * 1.1) return "ROSA";
-
-  return "---";
-}
-
-// ultrasónicos
-long medirDistancia(int trig, int echo) {
-  digitalWrite(trig, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trig, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trig, LOW);
-
-  long duracion = pulseIn(echo, HIGH, TIMEOUT_US);
-  if (duracion == 0) return 400;        // sin eco, muy lejos
-  return duracion * 0.034 / 2;          // convierte a cm
-}
+int dirGiro = 1;                 // 1 = derecha, -1 = izquierda
+unsigned long tEstado = 0;
+unsigned long tPantalla = 0;
+unsigned long tGiro = 0;
 
 // motores
 void ponerMotor(int in1, int in2, int en, bool adelante, int vel) {
@@ -100,71 +54,133 @@ void ponerMotor(int in1, int in2, int en, bool adelante, int vel) {
   analogWrite(en, vel);
 }
 
-void izquierda(bool adelante, int vel) {
-  ponerMotor(IN1_2, IN2_2, ENA2, adelante, vel);   // M2
-  ponerMotor(IN3_4, IN4_4, ENB4, adelante, vel);   // M4
+void avanzar() {
+  ponerMotor(L_IN1, L_IN2, L_ENA, true, VELOCIDAD);
+  ponerMotor(L_IN3, L_IN4, L_ENB, true, VELOCIDAD);
+  ponerMotor(R_IN1, R_IN2, R_ENA, true, VELOCIDAD);
+  ponerMotor(R_IN3, R_IN4, R_ENB, true, VELOCIDAD);
+  Serial.println("Avanzando hacia adelante...");
 }
 
-void derecha(bool adelante, int vel) {
-  ponerMotor(IN3_1, IN4_1, ENB1, adelante, vel);   // M1
-  ponerMotor(IN1_3, IN2_3, ENA3, adelante, vel);   // M3
+void girarDerecha() {
+  ponerMotor(L_IN1, L_IN2, L_ENA, true,  VELOCIDAD_GIRO);
+  ponerMotor(L_IN3, L_IN4, L_ENB, true,  VELOCIDAD_GIRO);
+  ponerMotor(R_IN1, R_IN2, R_ENA, false, VELOCIDAD_GIRO * 1.2);
+  ponerMotor(R_IN3, R_IN4, R_ENB, false, VELOCIDAD_GIRO * 1.2);
+  Serial.println("Girando hacia la derecha....");
 }
 
-void adelante() { izquierda(true, VELOCIDAD);  derecha(true, VELOCIDAD); }
-void girarIzq() { izquierda(false, VELOCIDAD); derecha(true, VELOCIDAD); }
-void girarDer() { izquierda(true, VELOCIDAD);  derecha(false, VELOCIDAD); }
-
-void girar90Izq() { girarIzq(); delay(TIEMPO_GIRO_90); adelante(); }
-void girar90Der() { girarDer(); delay(TIEMPO_GIRO_90); adelante(); }
+void girarIzquierda() {
+  ponerMotor(L_IN1, L_IN2, L_ENA, false, VELOCIDAD_GIRO);
+  ponerMotor(L_IN3, L_IN4, L_ENB, false, VELOCIDAD_GIRO);
+  ponerMotor(R_IN1, R_IN2, R_ENA, true,  VELOCIDAD_GIRO);
+  ponerMotor(R_IN3, R_IN4, R_ENB, true,  VELOCIDAD_GIRO);
+  Serial.println("Girando hacia la izquierda....");
+}
 
 void parar() {
-  analogWrite(ENB1, 0); analogWrite(ENA3, 0);
-  analogWrite(ENA2, 0); analogWrite(ENB4, 0);
-  digitalWrite(IN3_1, LOW); digitalWrite(IN4_1, LOW);
-  digitalWrite(IN1_3, LOW); digitalWrite(IN2_3, LOW);
-  digitalWrite(IN1_2, LOW); digitalWrite(IN2_2, LOW);
-  digitalWrite(IN3_4, LOW); digitalWrite(IN4_4, LOW);
+  analogWrite(L_ENA, 0); analogWrite(L_ENB, 0);
+  analogWrite(R_ENA, 0); analogWrite(R_ENB, 0);
+  digitalWrite(L_IN1, LOW); digitalWrite(L_IN2, LOW);
+  digitalWrite(L_IN3, LOW); digitalWrite(L_IN4, LOW);
+  digitalWrite(R_IN1, LOW); digitalWrite(R_IN2, LOW);
+  digitalWrite(R_IN3, LOW); digitalWrite(R_IN4, LOW);
+  Serial.println("Parando.....");
+}
+
+void iniciarAvance() {
+  avanzar();
+  estado = AVANZA;
+  tEstado = millis();
+  Serial.println("Iniciando Estado Avance");
+}
+
+// ultrasónicos
+int medirCm(int trig, int echo) {
+  digitalWrite(trig, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trig, LOW);
+  unsigned long dur = pulseIn(echo, HIGH, 25000UL);
+  if (dur == 0) return 400;
+  return (int)(dur * 0.034 / 2);
+}
+
+// sensor de color
+// Promedia varias lecturas de un canal (filtro segun s2/s3)
+float leerCanal(bool s2, bool s3) {
+  digitalWrite(S2, s2);
+  digitalWrite(S3, s3);
+  delay(10);                                   // estabilizar el filtro
+  float suma = 0;
+  int validas = 0;
+  for (int i = 0; i < MUESTRAS; i++) {
+    unsigned long p = pulseIn(SENSOR_OUT, LOW, 30000UL);
+    if (p > 0) { suma += p; validas++; }
+  }
+  return validas ? suma / validas : 0;
+}
+
+// Lee R, G, B y regresa el nombre del color mas cercano a tu calibracion
+const char* detectarColor() {
+  float r = leerCanal(LOW,  LOW);    // rojo
+  float g = leerCanal(HIGH, HIGH);   // verde
+  float b = leerCanal(LOW,  HIGH);   // azul
+
+  int mejor = -1;
+  float mejorDist = 1e9;
+  for (int i = 0; i < NUM_COLORES; i++) {
+    float dr = r - COLORES[i].r;
+    float dg = g - COLORES[i].g;
+    float db = b - COLORES[i].b;
+    float d2 = dr * dr + dg * dg + db * db;
+    if (d2 < mejorDist) { mejorDist = d2; mejor = i; }
+  }
+
+  // Para ajustar, abre el serial monitor
+  Serial.print("R:"); Serial.print(r, 1);
+  Serial.print(" G:"); Serial.print(g, 1);
+  Serial.print(" B:"); Serial.print(b, 1);
+  Serial.print(" -> ");
+  Serial.print(mejor >= 0 ? COLORES[mejor].nombre : "?");
+  Serial.print(" (d2="); Serial.print(mejorDist, 1); Serial.println(")");
+
+  if (mejor < 0 || mejorDist > UMBRAL_DIST2) return "---";
+  return COLORES[mejor].nombre;
 }
 
 // pantalla
-void mostrar(const char* titulo, unsigned long restanteMs, const String &color) {
-  char linea[24];
-  snprintf(linea, sizeof(linea), "%s %lu.%lu s", titulo, restanteMs / 1000, (restanteMs % 1000) / 100);
+void mostrar(const char* titulo, unsigned long restanteMs) {
+  char num[12];
+  snprintf(num, sizeof(num), "%lu.%lu s", restanteMs / 1000, (restanteMs % 1000) / 100);
 
-  pantalla.clearBuffer();
-  pantalla.setFont(u8g2_font_6x12_tr);
-  pantalla.drawStr(0, 11, linea);
-  pantalla.setFont(u8g2_font_logisoso16_tr);
-  pantalla.drawStr(0, 31, color.c_str());
-  pantalla.sendBuffer();
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_6x12_tr);
+  u8g2.drawStr(0, 11, titulo);
+  u8g2.drawStr(70, 31, colorActual);          // color detectado
+  u8g2.setFont(u8g2_font_logisoso16_tr);
+  u8g2.drawStr(0, 31, num);
+  u8g2.sendBuffer();
 }
 
 void setup() {
-  Serial.begin(9600);
-
-  // ultrasónicos
-  pinMode(trig1, OUTPUT); pinMode(echo1, INPUT);
-  pinMode(trig2, OUTPUT); pinMode(echo2, INPUT);
-  pinMode(trig3, OUTPUT); pinMode(echo3, INPUT);
-
-  // motores
-  int pines[] = { ENB1, IN3_1, IN4_1, ENA3, IN1_3, IN2_3, ENA2, IN1_2, IN2_2, ENB4, IN3_4, IN4_4 };
+  int pines[] = { L_IN1, L_IN2, L_ENA, L_IN3, L_IN4, L_ENB, R_IN1, R_IN2, R_ENA, R_IN3, R_IN4, R_ENB };
   for (int i = 0; i < 12; i++) pinMode(pines[i], OUTPUT);
+
+  pinMode(TRIG_F, OUTPUT); pinMode(ECHO_F, INPUT);
+  pinMode(TRIG_I, OUTPUT); pinMode(ECHO_I, INPUT);
+  pinMode(TRIG_D, OUTPUT); pinMode(ECHO_D, INPUT);
+
+  pinMode(S0, OUTPUT); pinMode(S1, OUTPUT);
+  pinMode(S2, OUTPUT); pinMode(S3, OUTPUT);
+  pinMode(SENSOR_OUT, INPUT);
+  digitalWrite(S0, HIGH);     // escala que fije
+  digitalWrite(S1, LOW);
+
+  Serial.begin(9600);
   parar();
-
-  // sensor de color
-  pinMode(PIN_S0, OUTPUT); pinMode(PIN_S1, OUTPUT);
-  pinMode(PIN_S2, OUTPUT); pinMode(PIN_S3, OUTPUT);
-  pinMode(PIN_OUT, INPUT);
-  digitalWrite(PIN_S0, HIGH);
-  digitalWrite(PIN_S1, LOW);
-
-  // pantalla
-  pantalla.begin();
-
-  // servo
-  servo.attach(servoPin);
-  servo.write(0);
+  u8g2.begin();
 
   estado = ESPERA;
   tEstado = millis();
@@ -177,9 +193,7 @@ void loop() {
   switch (estado) {
     case ESPERA:
       if (transcurrido >= TIEMPO_ESPERA) {
-        adelante();
-        estado = AVANZA;
-        tEstado = millis();
+        iniciarAvance();
         restante = TIEMPO_AVANCE;
       } else {
         restante = TIEMPO_ESPERA - transcurrido;
@@ -189,23 +203,57 @@ void loop() {
     case AVANZA:
       if (transcurrido >= TIEMPO_AVANCE) {
         parar();
-        estado = PARADO;
-        restante = 0;
+        estado = REVISA;
+        tEstado = millis();
       } else {
         restante = TIEMPO_AVANCE - transcurrido;
       }
       break;
 
-    case PARADO:
-      restante = 0;
+    case REVISA:
+      if (transcurrido >= TIEMPO_PAUSA) {
+        colorActual = detectarColor();      // el carro esta parado
+
+        int dF = medirCm(TRIG_F, ECHO_F);
+        Serial.print(" La distancia sensor frontal es: ");
+        Serial.println(dF);
+        int dI = medirCm(TRIG_I, ECHO_I);
+        Serial.print(" La distancia sensor izauierdo es: ");
+        Serial.println(dI);
+        int dD = medirCm(TRIG_D, ECHO_D);
+        Serial.print(" La distancia sensor derecho es: ");
+        Serial.println(dD);
+
+
+        if (dF >= DIST_OBSTACULO) {
+          iniciarAvance();
+        } else {
+          dirGiro = (dD > dI) ? 1 : -1;
+          if (dirGiro == 1) girarDerecha(); else girarIzquierda();
+          estado = GIRA;
+          tGiro = millis();
+        }
+      }
+      break;
+
+    case GIRA:
+      if (millis() - tGiro >= TIEMPO_GIRO) {
+        parar();
+        iniciarAvance();
+
+      }
       break;
   }
 
-  // cambia la pantalla cada 100 ms
+  // refresh de la pantalla cada 100 ms
   if (millis() - tPantalla >= 100) {
     tPantalla = millis();
-    if (estado == ESPERA)      mostrar("ESPERA", restante, "HOLIS");
-    else if (estado == AVANZA) mostrar("AVANZA", restante, colorActual);
-    else                       mostrar("PARADO", 0, colorActual);
+    if (estado == ESPERA) {
+      colorActual = detectarColor();        // prueba de colores
+      mostrar("ESPERANDO...", restante);
+    }
+    else if (estado == AVANZA) mostrar("AVANZANDO", restante);
+    else if (estado == REVISA) mostrar("REVISANDO", 0);
+    else mostrar(dirGiro == 1 ? "GIRO DERECHA" : "GIRO IZQUIERDA", 0);
   }
 }
